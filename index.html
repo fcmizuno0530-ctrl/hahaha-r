@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>棒人間ランゲーム 完成版</title>
+
+<style>
+/* ===== 基本 ===== */
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: sans-serif;
+  background: #87ceeb;
+}
+
+/* ===== UI ===== */
+#score, #highscore {
+  position: fixed;
+  left: 10px;
+  font-size: 20px;
+  font-weight: bold;
+  z-index: 20;
+}
+#score { top: 10px; }
+#highscore { top: 40px; }
+
+.screen {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+.screen button {
+  font-size: 24px;
+  padding: 10px 30px;
+  cursor: pointer;
+}
+
+/* ===== ゲーム ===== */
+#game {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ===== 背景 ===== */
+#bg-sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(#87ceeb, #cceeff);
+  z-index: 0;
+}
+/*===== 山 ===== */
+#bg-mountain {
+  position: absolute;
+  bottom: 0;
+  width: 400%;
+  height: 350px;
+  z-index: 1;
+
+  /* 山の色 */
+  background:
+    /* 影 */
+    linear-gradient(
+      -60deg,
+      rgba(0,0,0,0.25) 0 50%,
+      transparent 50% 100%
+    ),
+    /* 山のシルエット */
+    repeating-linear-gradient(
+      60deg,
+      #2f4f2f 0 120px,
+      #3a5f3a 120px 240px
+    );
+
+  /* 三角形っぽく切る */
+  clip-path: polygon(
+    0% 100%,
+    5% 70%,
+    12% 85%,
+    20% 60%,
+    28% 80%,
+    36% 55%,
+    45% 75%,
+    55% 50%,
+    65% 78%,
+    75% 60%,
+    85% 85%,
+    92% 70%,
+    100% 100%
+  );
+}
+
+#bg-cloud {
+  position: absolute;
+  top: 80px;
+  width: 300%;
+  height: 200px;
+  background:
+    radial-gradient(circle at 20% 40%, white 40px, transparent 41px),
+    radial-gradient(circle at 25% 40%, white 50px, transparent 51px),
+    radial-gradient(circle at 60% 30%, white 45px, transparent 46px),
+    radial-gradient(circle at 65% 30%, white 55px, transparent 56px);
+  background-repeat: repeat-x;
+  background-size: 400px 200px;
+  opacity: 0.8;
+  z-index: 2;
+}
+
+/* ===== プレイヤー ===== */
+#player {
+  position: absolute;
+  width: 60px;
+  height: 120px;
+  left: 200px;
+  z-index: 10;
+}
+.head {
+  position: absolute;
+  top: 0;
+  left: 19px;
+  width: 22px;
+  height: 22px;
+  border: 3px solid black;
+  border-radius: 50%;
+}
+.torso {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  width: 4px;
+  height: 40px;
+  background: black;
+}
+.arm, .leg {
+  position: absolute;
+  width: 4px;
+  background: black;
+  transform-origin: top;
+}
+.arm { top: 32px; height: 30px; }
+.arm.left { left: 28px; }
+.arm.right { left: 28px; }
+.leg { top: 68px; height: 40px; }
+.leg.left { left: 24px; }
+.leg.right { left: 32px; }
+
+/* ===== モーション ===== */
+.walk .leg.left { animation: legL .5s infinite; }
+.walk .leg.right { animation: legR .5s infinite; }
+.walk .arm.left { animation: armL .5s infinite; }
+.walk .arm.right { animation: armR .5s infinite; }
+
+@keyframes legL {0%{transform:rotate(25deg)}50%{transform:rotate(-25deg)}100%{transform:rotate(25deg)}}
+@keyframes legR {0%{transform:rotate(-25deg)}50%{transform:rotate(25deg)}100%{transform:rotate(-25deg)}}
+@keyframes armL {0%{transform:rotate(-20deg)}50%{transform:rotate(30deg)}100%{transform:rotate(-20deg)}}
+@keyframes armR {0%{transform:rotate(30deg)}50%{transform:rotate(-20deg)}100%{transform:rotate(30deg)}}
+
+.jump-up .leg { transform: rotate(40deg); }
+.jump-up .arm { transform: rotate(-50deg); }
+.jump-down .arm { transform: rotate(20deg); }
+
+/* ===== 足場 ===== */
+.platform {
+  position: absolute;
+  height: 30px;
+  background: #8b5a2b;
+  z-index: 5;
+}
+.platform::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  width: 100%;
+  height: 8px;
+  background: #3cb371;
+}
+.breakable { background: #777; }
+.breakable::before { background: #aaa; }
+
+/* ヒビ・揺れ・落下 */
+.crack1::after,
+.crack2::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.crack1::after {
+  background: linear-gradient(45deg, transparent 45%, #444 48%, transparent 52%);
+}
+.crack2::after {
+  background:
+    linear-gradient(45deg, transparent 45%, #333 48%, transparent 52%),
+    linear-gradient(-30deg, transparent 40%, #333 43%, transparent 46%);
+}
+.shake { animation: shake .15s infinite; }
+@keyframes shake {
+  0%{transform:translateX(0)}
+  50%{transform:translateX(3px)}
+  100%{transform:translateX(0)}
+}
+.falling { animation: fall .6s forwards; }
+@keyframes fall {
+  to { transform: translateY(300px) rotate(15deg); opacity: 0; }
+}
+
+/* ===== コイン ===== */
+.coin {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%,
+    #fff6a0,
+    gold 60%,
+    #c9a000 100%);
+  animation: spin 1s linear infinite;
+  z-index: 6;
+}
+@keyframes spin {
+  0%{transform:scaleX(1)}
+  50%{transform:scaleX(0.3)}
+  100%{transform:scaleX(1)}
+}
+</style>
+</head>
+
+<body>
+<div id="score">SCORE: 0</div>
+<div id="highscore">HIGH: 0</div>
+
+<div id="startScreen" class="screen">
+  <h1>棒人間ランゲーム</h1>
+  <button id="startBtn">START</button>
+</div>
+
+<div id="gameOverScreen" class="screen" style="display:none">
+  <h1>GAME OVER</h1>
+  <button id="restartBtn">RESTART</button>
+</div>
+
+<div id="game">
+  <div id="bg-sky"></div>
+  <div id="bg-mountain"></div>
+  <div id="bg-cloud"></div>
+
+  <div id="player">
+    <div class="head"></div>
+    <div class="torso"></div>
+    <div class="arm left"></div>
+    <div class="arm right"></div>
+    <div class="leg left"></div>
+    <div class="leg right"></div>
+  </div>
+</div>
+
+<script>
+const game = document.getElementById("game");
+const player = document.getElementById("player");
+const scoreEl = document.getElementById("score");
+const highScoreEl = document.getElementById("highscore");
+const startScreen = document.getElementById("startScreen");
+const gameOverScreen = document.getElementById("gameOverScreen");
+const bgMountain = document.getElementById("bg-mountain");
+const bgCloud = document.getElementById("bg-cloud");
+
+let highScore = localStorage.getItem("highScore") || 0;
+highScoreEl.textContent = "HIGH: " + highScore;
+
+let px, py, vy, cameraX, onGround, alive, standingPlatform;
+let platforms = [];
+let coins = [];
+let score = 0;
+
+const gravity = 0.8;
+const jumpPower = 17;
+const maxJumpHeight = 150;
+const keys = {};
+
+document.addEventListener("keydown", e => keys[e.code] = true);
+document.addEventListener("keyup", e => keys[e.code] = false);
+
+function createPlatform(x, y, w, breakable=false) {
+  const el = document.createElement("div");
+  el.className = "platform" + (breakable ? " breakable" : "");
+  el.style.width = w + "px";
+  game.appendChild(el);
+  platforms.push({el, x, y, w, breakable, timer:0});
+}
+
+function createCoin(x, y) {
+  const el = document.createElement("div");
+  el.className = "coin";
+  game.appendChild(el);
+  coins.push({el, x, y, taken:false});
+}
+
+function init() {
+  game.innerHTML = "";
+  game.appendChild(bgMountain);
+  game.appendChild(bgCloud);
+  game.appendChild(player);
+
+  platforms = [];
+  coins = [];
+  px = 200; py = 0; vy = 0;
+  cameraX = 0;
+  onGround = false;
+  alive = true;
+  score = 0;
+
+  createPlatform(0, window.innerHeight - 40, 600);
+}
+
+function generate() {
+  const last = platforms[platforms.length - 1];
+  if (last.x - cameraX < window.innerWidth) {
+    const gap = 80 + Math.random()*80;
+    const w = 80 + Math.random()*80;
+    let y = last.y + (Math.random()*2 - 1) * maxJumpHeight;
+    y = Math.max(200, Math.min(y, window.innerHeight - 120));
+    createPlatform(last.x + last.w + gap, y, w, Math.random()<0.3);
+    if (Math.random() < 0.6) {
+      createCoin(last.x + last.w + gap + w/2 - 12, y - 100);
+    }
+  }
+}
+
+function collision(prevY) {
+  onGround = false;
+  standingPlatform = null;
+  for (const p of platforms) {
+    if (
+      px+40 > p.x &&
+      px < p.x+p.w &&
+      prevY+120 <= p.y &&
+      py+120 >= p.y
+    ) {
+      py = p.y - 120;
+      vy = 0;
+      onGround = true;
+      standingPlatform = p;
+    }
+  }
+}
+
+function gameOver() {
+  alive = false;
+  gameOverScreen.style.display = "flex";
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem("highScore", highScore);
+    highScoreEl.textContent = "HIGH: " + highScore;
+  }
+}
+
+function loop() {
+  if (!alive) return;
+
+  const prevY = py;
+  if (keys["Space"] && onGround) {
+    vy = -jumpPower;
+    onGround = false;
+  }
+
+  vy += gravity;
+  py += vy;
+  px += 4;
+
+  collision(prevY);
+  generate();
+
+  // 崩れる床
+  platforms.forEach(p => {
+    if (p !== standingPlatform) {
+      p.timer = 0;
+      p.el.classList.remove("crack1","crack2","shake");
+    }
+  });
+  if (onGround && standingPlatform?.breakable) {
+    const p = standingPlatform;
+    p.timer++;
+    if (p.timer > 10) p.el.classList.add("crack1");
+    if (p.timer > 20) p.el.classList.add("crack2");
+    if (p.timer > 25) p.el.classList.add("shake");
+    if (p.timer > 35) {
+      p.el.classList.add("falling");
+      setTimeout(()=>p.el.remove(),600);
+      platforms.splice(platforms.indexOf(p),1);
+      onGround = false;
+    }
+  }
+
+  // コイン取得
+  coins.forEach(c => {
+    if (c.taken) return;
+    const dx = Math.abs((px+30)-(c.x+12));
+    const dy = Math.abs((py+60)-(c.y+12));
+    if (dx < 28 && dy < 40) {
+      c.taken = true;
+      score += 10;
+      c.el.remove();
+    }
+  });
+
+  if (py > window.innerHeight + 200) gameOver();
+
+  cameraX = px - 200;
+
+  bgMountain.style.left = -(cameraX * 0.3) + "px";
+  bgCloud.style.left = -(cameraX * 0.15) + "px";
+
+  platforms.forEach(p => {
+    p.el.style.left = (p.x - cameraX) + "px";
+    p.el.style.top = p.y + "px";
+  });
+  coins.forEach(c => {
+    c.el.style.left = (c.x - cameraX) + "px";
+    c.el.style.top = c.y + "px";
+  });
+
+  player.style.top = py + "px";
+  player.className = onGround ? "walk" : (vy < 0 ? "jump-up" : "jump-down");
+
+  score = Math.floor(px / 10);
+  scoreEl.textContent = "SCORE: " + score;
+
+  requestAnimationFrame(loop);
+}
+
+document.getElementById("startBtn").onclick = () => {
+  startScreen.style.display = "none";
+  init();
+  loop();
+};
+document.getElementById("restartBtn").onclick = () => {
+  gameOverScreen.style.display = "none";
+  init();
+  loop();
+};
+</script>
+</body>
+</html>
